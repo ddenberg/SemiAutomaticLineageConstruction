@@ -34,6 +34,7 @@
 % supports hyperthreading/multithreading then set it to 2 x [number of cores]
 numThreads = 4;
 
+%Change path here to point to CPD2 folder
 addpath(genpath('CPD2/core'));
 addpath(genpath('CPD2/data'));
 
@@ -74,9 +75,13 @@ downsample_fraction = 1/10;
 
 % Initialize empty graph and cell array for storing registration
 store_centroids = cell(length(valid_time_indices) - 1, 2);
+store_centroid_ids = cell(length(valid_time_indices) - 1, 2);
+store_point_clouds = cell(length(valid_time_indices) - 1, 2);
+store_point_cloud_ids = cell(length(valid_time_indices) - 1, 2);
+
 store_registration = cell((length(valid_time_indices)-1), 1);
 store_sigma2 = zeros((length(valid_time_indices)-1), 1);
-store_point_clouds = cell(length(valid_time_indices) - 1, 2);
+
 store_volumes = cell(length(valid_time_indices) - 1, 2);
 
 % numTrials controls how many random initializations to do 
@@ -224,8 +229,14 @@ for time_index_index = 1:length(valid_time_indices)-1
     store_centroids{time_index_index,1} = centroids1;
     store_centroids{time_index_index,2} = centroids2;
 
+    store_centroid_ids{time_index_index,1} = uVal1;
+    store_centroid_ids{time_index_index,2} = uVal2;
+
     store_point_clouds{time_index_index,1} = ptCloud1;
     store_point_clouds{time_index_index,2} = ptCloud2;
+
+    store_point_cloud_ids{time_index_index,1} = Val1;
+    store_point_cloud_ids{time_index_index,2} = Val2;
 
     store_volumes{time_index_index,1} = volumes1;
     store_volumes{time_index_index,2} = volumes2;
@@ -235,5 +246,5 @@ end
 toc;
 
 % Save output
-save(Registration_filename, 'store_registration', 'store_sigma2', 'store_centroids', ...
-    'store_point_clouds', 'store_volumes');
+save(Registration_filename, 'store_registration', 'store_sigma2', 'store_centroids', 'store_centroid_ids', ...
+    'store_point_clouds', 'store_point_cloud_ids', 'store_volumes');
