@@ -25,9 +25,6 @@
 % supports hyperthreading/multithreading then set it to 2 x [number of cores]
 numThreads = 4;
 
-addpath(genpath('CPD2/core'));
-addpath(genpath('CPD2/data'));
-
 % What is the prefix for the embryo names?
 % filename_seg_base = 'E:/Posfai_Lab/rpky/220309_out/st0/klb/klbOut_Cam_Long_%05d.lux.label.klb';
 % filename_raw_base = 'E:/Posfai_Lab/rpky/220309/stack_0_channel_0_obj_left/out/folder_Cam_Long_%05d.lux/klbOut_Cam_Long_%05d.lux.klb';
