@@ -46,7 +46,8 @@ voxel_vol = xyz_res^3;
 volume_threshold = 3000;
 
 % Which image frames to run over. Remember that the first frame is 0
-valid_time_indices = 0:100;
+final_frame = 100;
+valid_time_indices = 0:final_frame;
 
 % Do false negatives (set this to false to preserve memory)
 do_false_negatives_filter = false;

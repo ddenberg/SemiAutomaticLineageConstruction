@@ -49,7 +49,8 @@ Registration_filename = 'transforms.mat';
 use_preprocess_false_positives = true;
 
 % Which image frames to run over. Remember that the first frame is 0
-valid_time_indices = 0:100;
+final_frame = 100;
+valid_time_indices = 0:final_frame;
 
 % Voxel size before making isotropic
 pixel_size_xy_um = 0.208; % um
