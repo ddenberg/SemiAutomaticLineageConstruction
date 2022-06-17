@@ -109,8 +109,8 @@ for time_index_index = 1:length(valid_time_indices)-1
     
     % Exclude regions in segmented image whose mean intensities are within 2 stds of the background
     if use_preprocess_false_positives
-        seg1(ismember(seg1, preprocess.store_exclude{time_index_index})) = 0;
-        seg2(ismember(seg2, preprocess.store_exclude{time_index_index+1})) = 0;
+        seg1(ismember(seg1, preprocess.store_false_positives_guess{time_index_index})) = 0;
+        seg2(ismember(seg2, preprocess.store_false_positives_guess{time_index_index+1})) = 0;
     end
     
     % Rescale image 

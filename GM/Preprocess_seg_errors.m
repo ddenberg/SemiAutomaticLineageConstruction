@@ -16,6 +16,8 @@
 % [store_false_negatives_guess] is a logical array which is True if there may be
 % a false negative in the corresponding frame.
 %
+% [store_numcells] guess of number of cells per frame (after excluding the false positive guesses)
+%
 % Remember that index 1 of these arrays corresponds to frame 0 in the image
 % files. (index n -> frame n-1)
 %
@@ -109,4 +111,4 @@ for ii = 1:length(valid_time_indices)
     fprintf(' Done!\n');
 end
 
-save(output_name, 'store_false_positives_guess', 'store_false_negatives_guess');
+save(output_name, 'store_false_positives_guess', 'store_false_negatives_guess', 'store_numcells');
