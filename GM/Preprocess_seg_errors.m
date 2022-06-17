@@ -45,7 +45,7 @@ voxel_vol = xyz_res^3;
 
 % Which image frames to run over. Remember that the first frame is 0
 final_frame = 100;
-valid_time_indices = 0:final_frame;
+valid_time_indices = 26:final_frame;
 
 % How many standard deviations within background noise to flag false positives
 background_std_threshold = 2;
@@ -99,9 +99,10 @@ for ii = 1:length(valid_time_indices)
     exclude_logical = abs(stats.MeanIntensity - background_mean) < background_std_threshold * background_std;
     exclude_id = find(exclude_logical);
     
-    numcells = length(stats.MeanIntensity(~exclude_logical));
-    cell_intensity_mean = mean(stats.MeanIntensity(~exclude_logical));
-    cell_intensity_std = std(stats.MeanIntensity(~exclude_logical));
+    nan_ind = isnan(stats.MeanIntensity);
+    numcells = length(stats.MeanIntensity(~exclude_logical & ~nan_ind));
+    cell_intensity_mean = mean(stats.MeanIntensity(~exclude_logical & ~nan_ind));
+    cell_intensity_std = std(stats.MeanIntensity(~exclude_logical & ~nan_ind));
     
     if do_false_negatives_filter
         raw_subtract = raw;
