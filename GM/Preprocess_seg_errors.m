@@ -47,12 +47,18 @@ voxel_vol = xyz_res^3;
 final_frame = 100;
 valid_time_indices = 0:final_frame;
 
+% How many standard deviations within background noise to flag false positives
+background_std_threshold = 2;
+
 % Do false negatives (set this to false to preserve memory)
 do_false_negatives_filter = false;
 
 %Volume threshold for false negatives. If you are overestimating the number
 %of false negatives, try increasing this value.
 volume_threshold = 3000;
+
+% How many standard deviations within nuclei signal to flag for false negative
+cell_std_threshold = 2;
 
 store_false_positives_guess = cell(length(valid_time_indices), 1);
 store_numcells = zeros(length(valid_time_indices), 1);
@@ -79,7 +85,7 @@ for ii = 1:length(valid_time_indices)
     background_mean = mean(raw(background_ind));
     background_std = std(single(raw(background_ind)));
     stats = regionprops3(seg, raw, {'MeanIntensity', 'Volume'});
-    exclude_logical = abs(stats.MeanIntensity - background_mean) < 2 * background_std;
+    exclude_logical = abs(stats.MeanIntensity - background_mean) < background_std_threshold * background_std;
     exclude_id = find(exclude_logical);
     
     numcells = length(stats.MeanIntensity(~exclude_logical));
@@ -94,7 +100,7 @@ for ii = 1:length(valid_time_indices)
         
         stats_BW = regionprops3(BW, raw_subtract, {'Volume', 'MeanIntensity'});
         if any(stats_BW.Volume > volume_threshold & ...
-               abs(stats_BW.MeanIntensity - cell_intensity_mean) < 2 * cell_intensity_std)
+               abs(stats_BW.MeanIntensity - cell_intensity_mean) < cell_std_threshold * cell_intensity_std)
             store_false_negatives_guess(ii) = true;
         end
     end
