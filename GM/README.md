@@ -27,4 +27,11 @@ cmake ..
 make
 ```
 
-If you have gotten no errors, then the KLB library should have been compiled successfully.
+If you have gotten no errors, then the KLB library should have been compiled successfully. You can now copy 'compileMex_mac.m' to the matlabWrapper folder and compile the 'readKLBstack' mex file.
+
+## Preprocessing Instructions
+
+In 'Preprocess_seg_errors.m' set the following variables:
+
+1. [filename_seg_base] - path to the segmentation output in KLB format
+2. [filename_raw_base] - path to the raw output in KLB format
