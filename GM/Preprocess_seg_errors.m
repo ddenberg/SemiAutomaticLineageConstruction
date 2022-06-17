@@ -63,11 +63,13 @@ for ii = 1:length(valid_time_indices)
     time_index = valid_time_indices(ii);
     
     % read in segmented images
-    filename_seg = sprintf(filename_seg_base, time_index);
+    filename_seg_base_nspec = count(filename_seg_base, '%');
+    filename_seg = sprintf(filename_seg_base, time_index * ones(1, filename_seg_base_nspec));
     seg = readKLBstack(filename_seg, numThreads);
     
     % read in raw images
-    filename_raw = sprintf(filename_raw_base, time_index, time_index);
+    filename_raw_base_nspec = count(filename_raw_base, '%');
+    filename_raw = sprintf(filename_raw_base, time_index * ones(1, filename_raw_base_nspec));
     raw = readKLBstack(filename_raw, numThreads);
     
     % Exclude regions in segmented image whose mean intensities are within 2 stds of the background
