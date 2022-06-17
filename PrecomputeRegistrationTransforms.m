@@ -2,8 +2,8 @@
 function [] = PrecomputeRegistrationTransforms(  )
 
 %% User Inputs
-verbosemode = 1;  % show the plots of registration
-firstTime = 1;
+verbosemode = 0;  % show the plots of registration
+firstTime = 1; % should start with 1 not 0
 lastTime =  10; % last time for registration - you should have one more frame than this
 
 data_path = '/Users/lbrown/Documents/PosfaiLab/3DStardist/GataNanog/HaydenJan22Set/';
