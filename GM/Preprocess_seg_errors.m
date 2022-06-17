@@ -2,7 +2,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%% WARNING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % This script may use a lot of memory as it involves reading the raw image
-% file. ~16GB of memory is recommended.
+% file. ~8GB of memory is recommended.
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -34,7 +34,7 @@ filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309_out/st0/klb
 filename_raw_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309/stack_0_channel_0_obj_left/out/folder_Cam_Long_%05d.lux/klbOut_Cam_Long_%05d.lux.klb';
 
 % Change name or destination of the output
-output_name = 'preprocess.mat';
+output_name = 'preprocess_output.mat';
 
 pixel_size_xy_um = 0.208; % um
 pixel_size_z_um = 2.0; % um
@@ -64,6 +64,7 @@ store_false_positives_guess = cell(length(valid_time_indices), 1);
 store_numcells = zeros(length(valid_time_indices), 1);
 store_false_negatives_guess = false(length(valid_time_indices), 1);
 
+tic;
 for ii = 1:length(valid_time_indices)     
     fprintf('Beginning Preprocessing index %d...', ii);
     
@@ -81,9 +82,19 @@ for ii = 1:length(valid_time_indices)
     raw = readKLBstack(filename_raw, numThreads);
     
     % Exclude regions in segmented image whose mean intensities are within 2 stds of the background
-    background_ind = seg == 0;
-    background_mean = mean(raw(background_ind));
-    background_std = std(single(raw(background_ind)));
+    foreground_ind = find(seg > 0);
+    num_bg = numel(seg) - length(foreground_ind);
+    s_all = sum(raw, 'all');
+    s_foreground = sum(raw(foreground_ind), 'all');
+    background_mean = (s_all - s_foreground) / num_bg;
+%     background_mean = mean(raw(seg == 0));
+
+    ss_all = double(sum((single(raw) - background_mean).^2, 'all'));
+    ss_foreground = double(sum((single(raw(foreground_ind)) - background_mean).^2, 'all'));
+    ss_bg = ss_all - ss_foreground;
+    background_std = sqrt(ss_bg / (num_bg - 1));
+%     background_std = std(single(raw(seg == 0)));
+
     stats = regionprops3(seg, raw, {'MeanIntensity', 'Volume'});
     exclude_logical = abs(stats.MeanIntensity - background_mean) < background_std_threshold * background_std;
     exclude_id = find(exclude_logical);
@@ -116,5 +127,6 @@ for ii = 1:length(valid_time_indices)
     
     fprintf(' Done!\n');
 end
+toc;
 
 save(output_name, 'store_false_positives_guess', 'store_false_negatives_guess', 'store_numcells');
