@@ -13,7 +13,7 @@
 % ID corresponds to the ID of the label in the klb file (i.e. that is the
 % number you will see in imageJ).
 %
-% [store_false_negatives] is a logical array which is True if there may be
+% [store_false_negatives_guess] is a logical array which is True if there may be
 % a false negative in the corresponding frame.
 %
 % Remember that index 1 of these arrays corresponds to frame 0 in the image
@@ -41,10 +41,6 @@ xyz_res = 0.8320;
 % Volume of isotropic voxel
 voxel_vol = xyz_res^3;
 
-%Volume threshold for false negatives. If you are overestimating the number
-%of false negatives, try increasing this value.
-volume_threshold = 3000;
-
 % Which image frames to run over. Remember that the first frame is 0
 final_frame = 100;
 valid_time_indices = 0:final_frame;
@@ -52,9 +48,13 @@ valid_time_indices = 0:final_frame;
 % Do false negatives (set this to false to preserve memory)
 do_false_negatives_filter = false;
 
+%Volume threshold for false negatives. If you are overestimating the number
+%of false negatives, try increasing this value.
+volume_threshold = 3000;
+
 store_false_positives_guess = cell(length(valid_time_indices), 1);
 store_numcells = zeros(length(valid_time_indices), 1);
-store_false_negatives = false(length(valid_time_indices), 1);
+store_false_negatives_guess = false(length(valid_time_indices), 1);
 
 for ii = 1:length(valid_time_indices)     
     fprintf('Beginning Preprocessing index %d...', ii);
@@ -93,13 +93,13 @@ for ii = 1:length(valid_time_indices)
         stats_BW = regionprops3(BW, raw_subtract, {'Volume', 'MeanIntensity'});
         if any(stats_BW.Volume > volume_threshold & ...
                abs(stats_BW.MeanIntensity - cell_intensity_mean) < 2 * cell_intensity_std)
-            store_false_negatives(ii) = true;
+            store_false_negatives_guess(ii) = true;
         end
     end
 
     if ii > 1
         if numcells < store_numcells(ii-1)
-            store_false_negatives(ii) = true;
+            store_false_negatives_guess(ii) = true;
         end
     end
     
