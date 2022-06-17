@@ -31,19 +31,22 @@ If you have gotten no errors, then the KLB library should have been compiled suc
 
 ## Preprocessing Instructions
 
-In 'Preprocess_seg_errors.m' set the following variables:
+In 'Preprocess_seg_errors.m' set the following parameters:
 
 1. [filename_seg_base] - path to the segmentation output in KLB format
 2. [filename_raw_base] - path to the raw output in KLB format
 3. [output_name] - name of .mat file where the preprocessing output will be saved.
 4. [final_frame] - last frame ID of the image to process
-5. [do_false_negatives_filter] - flag to filter for false negatives
-6. [volume_threshold] - volume threshold for false negatives (does not matter if [do_false_negatives_filter] is false)
+5. [background_std_threshold] - how many standard deviations of the background noise to flag false positives
+6. [do_false_negatives_filter] - flag to filter for false negatives (uses more memory)
+7. [volume_threshold] - volume threshold for false negatives (does not matter if [do_false_negatives_filter] is false)
+8. [cell_std_threshold] - how many standard deviations of the nuclei signal to flag for false negatives
 
 This script will output two arrays which will be stored in [output_name]:
 
-1. [store_false_positives_guess] - cell array which stores the IDs of regions identified to be false positives for each frame.
-2. [store_false_negatives_guess] - logical array which is True if there may be a false negative at the corresponding index.
+1. [store_false_positives_guess] - cell array which stores the IDs of regions identified to be false positives for each frame
+2. [store_false_negatives_guess] - logical array which is True if there may be a false negative at the corresponding index
+3. [store_numcells] - number of cells per frame with probable false positives excluded
 
 Remember that index 1 of  these arrays corresponds to frame 0 in the image files. (Index n -> Frame n-1)
 
@@ -56,3 +59,7 @@ Example:
 filename_raw_base = '[LOCATION]/stack_0_channel_0_obj_left/out/folder_Cam_Long_%05d.lux/klbOut_Cam_Long_%05d.lux.klb';
 ```
 In this case I know that the raw images will look like 'stack_0_channel_0_obj_left/out/folder_Cam_Long_00023.lux/klbOut_Cam_Long_00023.lux.klb' with up to 5 leading zeros where each ID appears.
+
+### Correcting Segmentation Errors
+
+From the list of probable false positives and false negative frames you can now use Abhishek's modified AnnotatorJ tool to correct regions of interest. If you find that the false positives were correctly identified (or trust that they were correctly identified) then you can use a flag in Registration_Centroids.m to automatically ignore those regions.
