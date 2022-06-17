@@ -35,3 +35,24 @@ In 'Preprocess_seg_errors.m' set the following variables:
 
 1. [filename_seg_base] - path to the segmentation output in KLB format
 2. [filename_raw_base] - path to the raw output in KLB format
+3. [output_name] - name of .mat file where the preprocessing output will be saved.
+4. [final_frame] - last frame ID of the image to process
+5. [do_false_negatives_filter] - flag to filter for false negatives
+6. [volume_threshold] - volume threshold for false negatives (does not matter if [do_false_negatives_filter] is false)
+
+This script will output two arrays which will be stored in [output_name]:
+
+1. [store_false_positives_guess] - cell array which stores the IDs of regions identified to be false positives for each frame.
+2. [store_false_negatives_guess] - logical array which is True if there may be a false negative at the corresponding index.
+
+Remember that index 1 of  these arrays corresponds to frame 0 in the image files. (Index n -> Frame n-1)
+
+### Formatting [filename_seg_base] and [filename_raw_base]
+
+Make sure to use formatting operators to specify the ID of each frame. If you include more than one formatting operator know that they will all be filled with the same value.
+
+Example: 
+```
+filename_raw_base = '[LOCATION]/stack_0_channel_0_obj_left/out/folder_Cam_Long_%05d.lux/klbOut_Cam_Long_%05d.lux.klb';
+```
+In this case I know that the raw images will look like 'stack_0_channel_0_obj_left/out/folder_Cam_Long_00023.lux/klbOut_Cam_Long_00023.lux.klb' with up to 5 leading zeros where each ID appears.
