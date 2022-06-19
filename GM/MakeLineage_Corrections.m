@@ -7,41 +7,47 @@ addpath(genpath('CPD2/data'));
 addpath(genpath('graph_matching'))
 
 % Name of registration output file
-registration_filename = 'transforms.mat';
-registration_data = load(registration_filename);
+registration_filename = 'registration_output.mat';
+load(registration_filename);
 
 % Name of graph matching output file
 graph_output = 'graph_proposed.mat';
 load(graph_output);
 
-% Which image frames to run over. Remember that the first frame is 0
+% Which pairs of frames to run over. Remember that the first frame is 0.
+% If you would like to re-match certain frame pairs then set [frame_pairs] accordingly.
+first_frame = 0;
 final_frame = 40;
-valid_time_indices = 1:final_frame;
+frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 % also, check the alignment of this one with the time frame after
-for time_index_index = 1:(length(valid_time_indices)-1)
+for ii = 1:size(frame_pairs, 1)
      
-    % store this time index
-    time_index = valid_time_indices(time_index_index);
-    
-    % store next in series
-    time_index_plus_1 = valid_time_indices(time_index_index+1);
+    % get pair of frames
+    frame_pair = frame_pairs(ii,:);
+
+    % Get index of registration struct
+    registration_frame_pairs = cell2mat({registration.frame_pair}.');
+    reg_ind = find(ismember(registration_frame_pairs, frame_pair, 'rows'));
+    if isempty(reg_ind)
+        error('Registration output not found for frame pair (%d, %d)', frame_pair(1), frame_pair(2));
+    end
 
     % Get transform between frames  
-    Transform = registration_data.store_registration{time_index_plus_1,1};
+    Transform = registration(reg_ind).Transform;
 
     % Get centroids
-    centroids1 = registration_data.store_centroids{time_index_plus_1,1};
-    centroids2 = registration_data.store_centroids{time_index_plus_1,2};
+    centroids1 = registration(reg_ind).centroids1;
+    centroids2 = registration(reg_ind).centroids2;
 
     % Get point clouds
-    ptCloud1 = registration_data.store_point_clouds{time_index_plus_1,1};
-    ptCloud2 = registration_data.store_point_clouds{time_index_plus_1,2};
+    ptCloud1 = registration(reg_ind).ptCloud1;
+    ptCloud2 = registration(reg_ind).ptCloud2;
 
     % Get centroid labels
-    uVal1 = registration_data.store_centroid_ids{time_index_plus_1,1};
-    uVal2 = registration_data.store_centroid_ids{time_index_plus_1,2};
-    
+    uVal1 = registration(reg_ind).centroids1_ids;
+    uVal2 = registration(reg_ind).centroids2_ids;
+
     % Transform ptCloud2 and centroids2
     ptCloud2_transform = cpd_transform(ptCloud2, Transform);
     centroids2_transform  = cpd_transform(centroids2, Transform);
@@ -49,8 +55,8 @@ for time_index_index = 1:(length(valid_time_indices)-1)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     
-    nodes = [arrayfun(@(ind) sprintf('%03d_%03d', time_index, ind), uVal1, 'UniformOutput', false); 
-             arrayfun(@(ind) sprintf('%03d_%03d', time_index_plus_1, ind), uVal2, 'UniformOutput', false)];
+    nodes = [arrayfun(@(ind) sprintf('%03d_%03d', frame_pair(1), ind), uVal1, 'UniformOutput', false); 
+             arrayfun(@(ind) sprintf('%03d_%03d', frame_pair(2), ind), uVal2, 'UniformOutput', false)];
 
     sample_graph = subgraph(G_lineage, nodes);
     
@@ -70,6 +76,7 @@ for time_index_index = 1:(length(valid_time_indices)-1)
     hold on;
     scatter3(ptCloud2_transform(:,1), ptCloud2_transform(:,2), ptCloud2_transform(:,3), '.b');
     axis equal vis3d;
+    title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
     
     % visualization for checking if everything is correct - 3d plot of edges and nodes
     plot(sample_graph, 'XData', node_pos_x, 'YData', node_pos_y, 'ZData', node_pos_z, ...
@@ -81,13 +88,13 @@ for time_index_index = 1:(length(valid_time_indices)-1)
         'EdgeColor', 'k', 'LineWidth', 2.0,'NodeLabel',sample_graph.Nodes.Name, ...
         'NodeColor', node_colors, 'Interpreter', 'none');
     axis equal vis3d;
+    title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
         
     figure(3);
     clf;
-    G_proposed = get_proposed_tree(G_lineage, time_index_plus_1);
+    G_proposed = get_proposed_tree(G_lineage, frame_pair(2));
     plot(G_proposed,'layout','layered', 'Interpreter', 'none');
-    disp('time index');
-    disp(time_index);
+    title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
     
     pause;
 %     close all;

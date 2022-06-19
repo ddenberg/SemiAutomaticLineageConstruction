@@ -17,8 +17,8 @@ addpath(genpath('CPD2/data'));
 addpath(genpath('graph_matching'))
 
 % Name of registration output file
-registration_filename = 'transforms.mat';
-registration_data = load(registration_filename);
+registration_filename = 'registration_output.mat';
+load(registration_filename);
 
 % Graph output file
 graph_output = 'graph_proposed.mat';
@@ -32,11 +32,13 @@ else
 end
 
 % flag to show plots after matching. You can view them again afterwards if you want.
-show_plots = false;
+show_plots = true;
 
-% Which image frames to run over. Remember that the first frame is 0
+% Which pairs of frames to run over. Remember that the first frame is 0.
+% If you would like to re-match certain frame pairs then set [frame_pairs] accordingly.
+first_frame = 0;
 final_frame = 40;
-valid_time_indices = 1:final_frame;
+frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 %%%%%%%%%%%% IMPORTANT FLAG %%%%%%%%%%%%%%%%
 %
@@ -65,36 +67,42 @@ graph_match_lambda = 1;
 division_time_threshold = 20;
 
 % also, check the alignment of this one with the time frame after
-for time_index_index = 1:(length(valid_time_indices)-1)
-     
-    % store this time index
-    time_index = valid_time_indices(time_index_index);
+for ii = 1:size(frame_pairs, 1)
     
-    % store next in series
-    time_index_plus_1 = valid_time_indices(time_index_index+1);
+    % get pair of frames
+    frame_pair = frame_pairs(ii,:);
+
+    fprintf('Beginning graph matching for pair (%d, %d)...', frame_pair(1), frame_pair(2));
+
+    % Get index of registration struct
+    registration_frame_pairs = cell2mat({registration.frame_pair}.');
+    reg_ind = find(ismember(registration_frame_pairs, frame_pair, 'rows'));
+    if isempty(reg_ind)
+        error('Registration output not found for frame pair (%d, %d)', frame_pair(1), frame_pair(2));
+    end
     
     % Get volumes
-    volumes1 = registration_data.store_volumes{time_index_plus_1,1};
-    volumes2 = registration_data.store_volumes{time_index_plus_1,2};
+    volumes1 = registration(reg_ind).volumes1;
+    volumes2 = registration(reg_ind).volumes2;
 
     % Compute average radius of a nucleus assuming they are spherical
     average_cell_volume = (sum(volumes1) + sum(volumes2)) / (length(volumes1) + length(volumes2));
     average_cell_radius = (average_cell_volume * 3 / (4 * pi))^(1/3);
 
     % Get transform between frames  
-    Transform = registration_data.store_registration{time_index_plus_1,1};
+    Transform = registration(reg_ind).Transform;
 
     % Get centroids
-    centroids1 = registration_data.store_centroids{time_index_plus_1,1};
-    centroids2 = registration_data.store_centroids{time_index_plus_1,2};
+    centroids1 = registration(reg_ind).centroids1;
+    centroids2 = registration(reg_ind).centroids2;
 
     % Get point clouds
-    ptCloud1 = registration_data.store_point_clouds{time_index_plus_1,1};
-    ptCloud2 = registration_data.store_point_clouds{time_index_plus_1,2};
+    ptCloud1 = registration(reg_ind).ptCloud1;
+    ptCloud2 = registration(reg_ind).ptCloud2;
 
     % Get centroid labels
-    uVal1 = registration_data.store_centroid_ids{time_index_plus_1,1};
-    uVal2 = registration_data.store_centroid_ids{time_index_plus_1,2};
+    uVal1 = registration(reg_ind).centroids1_ids;
+    uVal2 = registration(reg_ind).centroids2_ids;
     
     % Transform ptCloud2 and centroids2
     ptCloud2_transform = cpd_transform(ptCloud2, Transform);
@@ -115,24 +123,24 @@ for time_index_index = 1:(length(valid_time_indices)-1)
     Dist_new_old = pdist2(centroids1, centroids2_transform);
     X0 = exp(-Dist_new_old.^2 / (2 * sigma^2));
     
-    if time_index > 0
-        G_lineage = get_proposed_tree(G_lineage, time_index);
-        division_constraints = get_division_constraints(G_lineage, division_time_threshold, time_index);
+    if frame_pair(1) > 0
+        G_lineage = get_proposed_tree(G_lineage, frame_pair(1));
+        division_constraints = get_division_constraints(G_lineage, division_time_threshold, frame_pair(1));
     else
         division_constraints = [];
     end
-    lineage_constraints = get_lineage_constraints(lineage_corrections, uVal1, uVal2, time_index, time_index_plus_1);
+    lineage_constraints = get_lineage_constraints(lineage_corrections, uVal1, uVal2, frame_pair(1), frame_pair(2));
 
     X_min = ConstrainedMinimization(X0, A_old, A_new, B_old, B_new, graph_match_lambda, division_constraints, lineage_constraints);
     [~, match_ind] = max(X_min, [], 1);
     
     match_pairs = [uVal1(match_ind), uVal2];
-    nodes = [arrayfun(@(ind) sprintf('%03d_%03d', time_index, ind), uVal1, 'UniformOutput', false); 
-             arrayfun(@(ind) sprintf('%03d_%03d', time_index_plus_1, ind), uVal2, 'UniformOutput', false)];
+    nodes = [arrayfun(@(ind) sprintf('%03d_%03d', frame_pair(1), ind), uVal1, 'UniformOutput', false); 
+             arrayfun(@(ind) sprintf('%03d_%03d', frame_pair(2), ind), uVal2, 'UniformOutput', false)];
     
     edges = cell(size(match_pairs));
-    edges(:,1) = arrayfun(@(ind) sprintf('%03d_%03d', time_index, ind), match_pairs(:,1), 'UniformOutput', false);
-    edges(:,2) = arrayfun(@(ind) sprintf('%03d_%03d', time_index_plus_1, ind), match_pairs(:,2), 'UniformOutput', false);
+    edges(:,1) = arrayfun(@(ind) sprintf('%03d_%03d', frame_pair(1), ind), match_pairs(:,1), 'UniformOutput', false);
+    edges(:,2) = arrayfun(@(ind) sprintf('%03d_%03d', frame_pair(2), ind), match_pairs(:,2), 'UniformOutput', false);
     edge_table = table(edges, 'VariableNames', {'EndNodes'});
     node_table_names = table(nodes, 'VariableNames', {'Name'});
     node_table_pos = table(nodes, [centroids1(:,1); centroids2_transform(:,1)], ...
@@ -162,6 +170,7 @@ for time_index_index = 1:(length(valid_time_indices)-1)
         % visualization for checking if everything is correct - 3d plot of edges and nodes
         plot(sample_graph, 'XData', sample_graph.Nodes.xpos, 'YData', sample_graph.Nodes.ypos, ...
             'ZData', sample_graph.Nodes.zpos, 'EdgeColor', 'k', 'LineWidth', 2.0, 'Interpreter', 'none');
+        title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
     
         figure(2);
         clf;
@@ -169,17 +178,20 @@ for time_index_index = 1:(length(valid_time_indices)-1)
             'ZData', sample_graph.Nodes.zpos, 'EdgeColor', 'k', 'LineWidth', 2.0,'NodeLabel',sample_graph.Nodes.Name, ...
             'NodeColor', node_colors, 'Interpreter', 'none');
         axis equal vis3d;
+        title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
             
         figure(3);
         clf;
         plot(G_lineage,'layout','layered', 'Interpreter', 'none');
-        disp('time index');
-        disp(time_index);
-        close all;
+        title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
+%         disp('time index');
+%         disp(time_index);
+        drawnow;
+        pause;
     end
+
+    fprintf(' Done!\n');
 
     % Save lineage tree
     save(graph_output, 'G_lineage');
 end
-
-

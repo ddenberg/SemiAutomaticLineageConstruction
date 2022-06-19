@@ -6,27 +6,22 @@
 % registration only on the cell centroids which still produces good
 % results.
 %
-% It should take about 10-20 seconds per frame with the current parameters.
-% This is runnable with 8GB of RAM but 16GB is recommended.
+% It should take ~10 seconds per frame with the current parameters.
+% This is runnable with 8GB.
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%% OUTPUT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% [store_registration] is a cell array of the best registration found over
-% numTrials per pair of frames
-%
-% [store_sigma2] is a vector of the best sigma2 value found for each
-% registered pair
-%
-% [store_centroids] is a cell array of the unregistered centroids between each pair of frames
-%
-% [store_point_clouds] is a cell array of the unregistered point clouds between each pair of frames
-%
-% [store_volumes] is a cell array of the volumes for each nucleus between each pair of frames
-%
-% Remember that index 1 of these arrays corresponds to the pair of frames
-% [0, 1] (more generally index n -> frame pair [n-1, n]
+% [registration] struct for each pair of frames containing
+%       -frame_pair - [n,n+1] pair of frames
+%       -centroids1 and centroid2 - centroids from each frame
+%       -centroids1_ids and centroid2_ids - ids for each centroid
+%       -ptCloud1 and ptCloud2 - full or downsampled point cloud for each frame
+%       -ptCloud1_ids and ptCloud2_ids - ids for each point in point clouds
+%       -volumes1 and volumes2 - volumes of each segmented region
+%       -sigma2 - sigma2 value from CPD registration
+%       -Transform - transformation struct
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -44,13 +39,20 @@ filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309_out/st0/klb
 
 % Name of output file
 Registration_filename = 'transforms.mat';
+if isfile(Registration_filename)
+    load(Registration_filename);
+else
+    registration = [];
+end
 
-% Set this to false if you do not want to use the preprocessing output
+% Set this to true to exclude the false positives found using the Preprocess_seg_errors script
 use_preprocess_false_positives = true;
 
-% Which image frames to run over. Remember that the first frame is 0
+% Which pairs of frames to run over. Remember that the first frame is 0.
+% If you would like to re-register for certain frame pairs then set [frame_pairs] accordingly.
+first_frame = 0;
 final_frame = 100;
-valid_time_indices = 0:final_frame;
+frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 % Voxel size before making isotropic
 pixel_size_xy_um = 0.208; % um
@@ -64,54 +66,34 @@ voxel_vol = xyz_res^3;
 sigma2_threshold = 5;
 
 % Name of preprocessing output
-Preprocess_filename = 'preprocess.mat';
+Preprocess_filename = 'preprocess_output.mat';
 if use_preprocess_false_positives
     preprocess = load(Preprocess_filename);
 else
-    preprocess = struct('store_false_positives_guess', cell(length(valid_time_indices), 1));
+    preprocess = struct('store_false_positives_guess', cell(length(0:final_frame), 1));
 end
 
 % Option to downsample point clouds in the saved output. Will reduce storage space
 downsample_fraction = 1/10;
 
-% Initialize empty graph and cell array for storing registration
-store_centroids = cell(length(valid_time_indices) - 1, 2);
-store_centroid_ids = cell(length(valid_time_indices) - 1, 2);
-store_point_clouds = cell(length(valid_time_indices) - 1, 2);
-store_point_cloud_ids = cell(length(valid_time_indices) - 1, 2);
-
-store_registration = cell((length(valid_time_indices)-1), 1);
-store_sigma2 = zeros((length(valid_time_indices)-1), 1);
-
-store_volumes = cell(length(valid_time_indices) - 1, 2);
-
 % numTrials controls how many random initializations to do 
 numTrials = 1e3;
 
 tic;
-for time_index_index = 1:length(valid_time_indices)-1 
-     
-    fprintf('Beginning Registration index %d...', time_index_index);
+for ii = 1:size(frame_pairs, 1)
     
-    % time_index is the frame id of the current frame
-    time_index = valid_time_indices(time_index_index);
-    
-    % time_index_plus_1 is the frame id of the following frame
-    time_index_plus_1 = valid_time_indices(time_index_index+1);
+    % get pair of frames
+    frame_pair = frame_pairs(ii,:);
+
+    fprintf('Beginning Registration Pair (%d, %d)...', frame_pair(1), frame_pair(2));
     
     % read in segmented images
     filename_seg_base_nspec = count(filename_seg_base, '%');
-    filename_seg = sprintf(filename_seg_base, time_index * ones(1, filename_seg_base_nspec));
+    filename_seg = sprintf(filename_seg_base, frame_pair(1) * ones(1, filename_seg_base_nspec));
     seg1 = readKLBstack(filename_seg, numThreads);
     
-    filename_seg = sprintf(filename_seg_base, time_index_plus_1 * ones(1, filename_seg_base_nspec));
-    seg2 = readKLBstack(filename_seg, numThreads);
-    
-    % Exclude regions in segmented image whose mean intensities are within 2 stds of the background
-    if use_preprocess_false_positives
-        seg1(ismember(seg1, preprocess.store_false_positives_guess{time_index_index})) = 0;
-        seg2(ismember(seg2, preprocess.store_false_positives_guess{time_index_index+1})) = 0;
-    end
+    filename_seg = sprintf(filename_seg_base, frame_pair(2) * ones(1, filename_seg_base_nspec));
+    seg2 = readKLBstack(filename_seg, numThreads);    
     
     % Rescale image 
     resXY = 0.208;
@@ -119,6 +101,19 @@ for time_index_index = 1:length(valid_time_indices)-1
     reduceRatio = 1/4;
     seg1 = isotropicSample_nearest(seg1, resXY, resZ, reduceRatio);
     seg2 = isotropicSample_nearest(seg2, resXY, resZ, reduceRatio);
+
+    % Exclude regions in segmented image whose mean intensities are within 2 stds of the background
+    if use_preprocess_false_positives
+        temp = preprocess.store_false_positives_guess{frame_pair(1)+1};
+        for jj = 1:length(temp)
+            seg1(seg1 == temp(jj)) = 0;
+        end
+
+        temp = preprocess.store_false_positives_guess{frame_pair(2)+1};
+        for jj = 1:length(temp)
+            seg2(seg2 == temp(jj)) = 0;
+        end
+    end
    
     % Find non-zero indices of image
     [Y, XZ, Val1] = find(seg1);
@@ -130,8 +125,8 @@ for time_index_index = 1:length(valid_time_indices)-1
     %Compute centroids
     uVal1 = unique(Val1);
     centroids1 = zeros(length(uVal1), 3);
-    for ii = 1:length(uVal1)
-        centroids1(ii,:) = mean(ptCloud1(Val1 == uVal1(ii),:), 1);
+    for jj = 1:length(uVal1)
+        centroids1(jj,:) = mean(ptCloud1(Val1 == uVal1(jj),:), 1);
     end
     
     [Y, XZ, Val2] = find(seg2);
@@ -143,8 +138,8 @@ for time_index_index = 1:length(valid_time_indices)-1
     %Compute centroids
     uVal2 = unique(Val2);
     centroids2 = zeros(length(uVal2), 3);
-    for ii = 1:length(uVal2)
-        centroids2(ii,:) = mean(ptCloud2(Val2 == uVal2(ii),:), 1);
+    for jj = 1:length(uVal2)
+        centroids2(jj,:) = mean(ptCloud2(Val2 == uVal2(jj),:), 1);
     end
 
     % Compute some stats about the volumes of each cell to make an estimate of the cell radius
@@ -177,8 +172,11 @@ for time_index_index = 1:length(valid_time_indices)-1
 
     step = 1;
     sigma2 = Inf;
-    sigma2_trials = zeros(numTrials,1);
-    transforms_trials = cell(numTrials, 1);
+    sigma2_best = Inf;
+    Transform_best = [];
+
+%     sigma2_trials = zeros(numTrials,1);
+%     transforms_trials = cell(numTrials, 1);
     while ((sigma2 > sigma2_threshold) && (step <= numTrials))    
 
         if step == 1
@@ -210,43 +208,50 @@ for time_index_index = 1:length(valid_time_indices)-1
         [Transform, ~, sigma2] = cpd_register(fixed.Location, moving_temp.Location, opt);
 
         Transform.R = (R * Transform.R')';
-        
-        store_registration{time_index_index, 1} = Transform;
-        store_sigma2(time_index_index) = sigma2;
-        
-        transforms_trials{step, 1} = Transform;
-        sigma2_trials(step) = sigma2;
+
+        if sigma2 < sigma2_best
+            sigma2_best = sigma2;
+            Transform_best = Transform;
+        end
+
         step = step + 1;
     end
 
-    if step > numTrials
-%         fprintf(' Did not find transformation with sigma2 < %f', sigma2_threshold);
-        % get the best one we found
-        [min_sigma2, min_ind] = min(sigma2_trials);
-        Transform = transforms_trials{min_ind,1};
-        store_registration{time_index_index, 1} = Transform;
-        store_sigma2(time_index_index) = min_sigma2;
-    end
+    % Update registration struct
+    if ~isempty(registration)
+        stored_frame_pairs = cell2mat({registration.frame_pair}.');
+        ind = find(ismember(stored_frame_pairs, frame_pair, 'rows'));
 
-    store_centroids{time_index_index,1} = centroids1;
-    store_centroids{time_index_index,2} = centroids2;
+        if isempty(ind)
+            ind = size(registration, 1) + 1;
+        end
 
-    store_centroid_ids{time_index_index,1} = uVal1;
-    store_centroid_ids{time_index_index,2} = uVal2;
+        registration(ind,1) = struct('frame_pair', frame_pair, ...
+                                     'centroids1', centroids1, 'centroids2', centroids2, ...
+                                     'centroids1_ids', uVal1, 'centroids2_ids', uVal2, ...
+                                     'ptCloud1', ptCloud1, 'ptCloud2', ptCloud2, ...
+                                     'ptCloud1_ids', Val1, 'ptCloud2_ids', Val2, ...
+                                     'volumes1', volumes1, 'volumes2', volumes2, ...
+                                     'sigma2', sigma2_best, 'Transform', Transform_best);
+    else
+        registration = struct('frame_pair', frame_pair, ...
+                               'centroids1', centroids1, 'centroids2', centroids2, ...
+                               'centroids1_ids', uVal1, 'centroids2_ids', uVal2, ...
+                               'ptCloud1', ptCloud1, 'ptCloud2', ptCloud2, ...
+                               'ptCloud1_ids', Val1, 'ptCloud2_ids', Val2, ...
+                               'volumes1', volumes1, 'volumes2', volumes2, ...
+                               'sigma2', sigma2_best, 'Transform', Transform_best);
+    end 
+    
 
-    store_point_clouds{time_index_index,1} = ptCloud1;
-    store_point_clouds{time_index_index,2} = ptCloud2;
-
-    store_point_cloud_ids{time_index_index,1} = Val1;
-    store_point_cloud_ids{time_index_index,2} = Val2;
-
-    store_volumes{time_index_index,1} = volumes1;
-    store_volumes{time_index_index,2} = volumes2;
-
-    fprintf(' Best Sigma2: %f, Done!\n', store_sigma2(time_index_index));
+    fprintf(' Best Sigma2: %f, Done!\n', sigma2_best);
 end
 toc;
 
+%Sort rows of registration output
+stored_frame_pairs = cell2mat({registration.frame_pair}.');
+[~, ind] = sortrows(stored_frame_pairs);
+registration = registration(ind,:);
+
 % Save output
-save(Registration_filename, 'store_registration', 'store_sigma2', 'store_centroids', 'store_centroid_ids', ...
-    'store_point_clouds', 'store_point_cloud_ids', 'store_volumes');
+save(Registration_filename, 'registration');

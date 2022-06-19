@@ -45,7 +45,7 @@ voxel_vol = xyz_res^3;
 
 % Which image frames to run over. Remember that the first frame is 0
 final_frame = 100;
-valid_time_indices = 26:final_frame;
+valid_time_indices = 0:final_frame;
 
 % How many standard deviations within background noise to flag false positives
 background_std_threshold = 2;
