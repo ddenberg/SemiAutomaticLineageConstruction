@@ -139,9 +139,11 @@ for ii = 1:size(preprocess, 1)
     if frame_id > 0
         frame_id_prev = frame_id - 1;
         prev_ind = find(stored_frame_ids == frame_id_prev);
-        if preprocess(ii).num_cells < preprocess(prev_ind).num_cells
-            preprocess(ii).false_negative_guess = true;
-        end
+	    if ~isempty(prev_ind)
+		    if preprocess(ii).num_cells < preprocess(prev_ind).num_cells
+                preprocess(ii).false_negative_guess = true;
+            end
+		end
     end
 end
 
