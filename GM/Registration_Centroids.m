@@ -1,12 +1,11 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% If you don't have enough memory, processing power, or time to run the
-% full registration, try running this script instead. It will do
-% registration only on the cell centroids which still produces good
-% results.
+% This should take ~10 seconds per frame when only using centroids.
 %
-% It should take ~10 seconds per frame with the current parameters.
+% This may increase to 30-60 seconds per frame when also doing a final registration 
+% using the full point clouds.
+%
 % This is runnable with 8GB.
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -76,6 +75,9 @@ downsample_fraction = 1/10;
 
 % numTrials controls how many random initializations to do 
 numTrials = 1e3;
+
+% Do final registration with full point clouds
+final_full_register = true;
 
 tic;
 for ii = 1:size(frame_pairs, 1)
@@ -169,48 +171,46 @@ for ii = 1:size(frame_pairs, 1)
         ptCloud2 = ptCloud2(p2,:);
     end
 
-
-    moving = pointCloud(centroids2);
-    fixed = pointCloud(centroids1);
-
+    % Initialize variables for CPD
     step = 1;
     sigma2 = Inf;
     sigma2_best = Inf;
     Transform_best = [];
 
-%     sigma2_trials = zeros(numTrials,1);
-%     transforms_trials = cell(numTrials, 1);
+    Transform_init.R = eye(3);
+    Transform_init.s = 1;
+    Transform_init.method = 'rigid';
+    Transform_init.t = zeros(3, 1);
+
+    % Set the options
+    opt.method='rigid'; % use rigid registration
+    opt.viz=0;          % show every iteration
+    opt.outliers=0;     % do not assume any noise
+
+    opt.normalize=0;    % normalize to unit variance and zero mean before registering (default)
+    opt.scale=0;        % estimate global scaling too (default)
+    opt.rot=1;          % estimate strictly rotational matrix (default)
+    opt.corresp=0;      % do not compute the correspondence vector at the end of registration (default)
+
+    opt.max_it=200;     % max number of iterations
+    opt.tol=1e-5;       % tolerance
+    opt.fgt = 0;        % make faster (for some reason this doesn't produce good results, so set this to 0).
     while ((sigma2 > sigma2_threshold) && (step <= numTrials))    
 
         if step == 1
-            R = eye(3);
+            Transform_init.R = eye(3);
         else
-            R = orth(randn(3));
+            Transform_init.R = orth(randn(3));
         end
 
-        tform = rigid3d(R, [0, 0, 0]);
-        
-        moving_temp = pctransform(moving,tform);
-
-        % Set the options
-        opt.method='rigid'; % use rigid registration
-        opt.viz=0;          % show every iteration
-        opt.outliers=0;     % do not assume any noise
-
-        opt.normalize=0;    % normalize to unit variance and zero mean before registering (default)
-        opt.scale=0;        % estimate global scaling too (default)
-        opt.rot=1;          % estimate strictly rotational matrix (default)
-        opt.corresp=0;      % do not compute the correspondence vector at the end of registration (default)
-
-        opt.max_it=200;     % max number of iterations
-        opt.tol=1e-5;       % tolerance
-        opt.ftg = 1; % make faster
-
+        % Initialize centroids2
+        centroids2_init = cpd_transform(centroids2, Transform_init);
 
         % registering Y to X
-        [Transform, ~, sigma2] = cpd_register(fixed.Location, moving_temp.Location, opt);
+        [Transform, ~, sigma2] = cpd_register(centroids1, centroids2_init, opt);
 
-        Transform.R = (R * Transform.R')';
+        % Update transformation using initialization
+        Transform.R = Transform.R * Transform_init.R;
 
         if sigma2 < sigma2_best
             sigma2_best = sigma2;
@@ -218,6 +218,20 @@ for ii = 1:size(frame_pairs, 1)
         end
 
         step = step + 1;
+    end
+
+    if final_full_register
+        % Do a final registration using the full (or downsampled) point clouds
+        % This registration will be initialized using the best of the centroid trials
+        Transform_init = Transform_best;
+        ptCloud2_init = cpd_transform(ptCloud2, Transform_init);
+    
+        % registering Y to X
+        [Transform, ~, sigma2_best] = cpd_register(ptCloud1, ptCloud2_init, opt);
+    
+        % Update transformation using initialization
+        Transform_best.R = Transform.R * Transform_init.R;
+        Transform_best.t = Transform.t + Transform_init.t;
     end
 
     % Update registration struct

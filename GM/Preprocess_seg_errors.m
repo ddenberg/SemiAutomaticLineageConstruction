@@ -104,13 +104,9 @@ for ii = 1:length(valid_frames)
         stats_BW = regionprops3(BW, raw_subtract, {'Volume', 'MeanIntensity'});
         if any(stats_BW.Volume > volume_threshold & ...
                abs(stats_BW.MeanIntensity - cell_intensity_mean) < cell_std_threshold * cell_intensity_std)
-%             store_false_negatives_guess(ii) = true;
             frame_false_negative = true;
         end
     end
-    
-%     store_false_positives_guess{ii} = exclude_id;
-%     store_numcells(ii) = numcells;
 
     % Update output struct
     if ~isempty(preprocess)
