@@ -8,18 +8,11 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%% OUTPUT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% [store_false_positives_guess] is a cell array which contains the IDs of
-% labels which this script has identified to be false positives. Note: the
-% ID corresponds to the ID of the label in the klb file (i.e. that is the
-% number you will see in imageJ).
-%
-% [store_false_negatives_guess] is a logical array which is True if there may be
-% a false negative in the corresponding frame.
-%
-% [store_numcells] guess of number of cells per frame (after excluding the false positive guesses)
-%
-% Remember that index 1 of these arrays corresponds to frame 0 in the image
-% files. (index n -> frame n-1)
+% [preprocess] array of structs which contains:
+%       -frame_id: ID of the frame
+%       -false_positive_ids_guess: list of region ids identified to be false positives
+%       -false_negative_guess: True if a false negative is found
+%       -num_cells: guess of number of cells per frame (after excluding the false positive guesses)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -34,18 +27,16 @@ filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309_out/st0/klb
 filename_raw_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309/stack_0_channel_0_obj_left/out/folder_Cam_Long_%05d.lux/klbOut_Cam_Long_%05d.lux.klb';
 
 % Change name or destination of the output
-output_name = 'preprocess_output.mat';
-
-pixel_size_xy_um = 0.208; % um
-pixel_size_z_um = 2.0; % um
-% Voxel size after making isotropic
-xyz_res = 0.8320;
-% Volume of isotropic voxel
-voxel_vol = xyz_res^3;
+preprocess_output = 'preprocess.mat';
+if isfile(preprocess_output)
+    load(preprocess_output);
+else
+    preprocess = [];
+end
 
 % Which image frames to run over. Remember that the first frame is 0
 final_frame = 100;
-valid_time_indices = 0:final_frame;
+valid_frames = 0:final_frame;
 
 % How many standard deviations within background noise to flag false positives
 background_std_threshold = 2;
@@ -60,25 +51,26 @@ volume_threshold = 3000;
 % How many standard deviations within nuclei signal to flag for false negative
 cell_std_threshold = 2;
 
-store_false_positives_guess = cell(length(valid_time_indices), 1);
-store_numcells = zeros(length(valid_time_indices), 1);
-store_false_negatives_guess = false(length(valid_time_indices), 1);
+store_false_positives_guess = cell(length(valid_frames), 1);
+store_numcells = zeros(length(valid_frames), 1);
+store_false_negatives_guess = false(length(valid_frames), 1);
 
 tic;
-for ii = 1:length(valid_time_indices)     
-    fprintf('Beginning Preprocessing index %d...', ii);
-    
-    % store this time index
-    time_index = valid_time_indices(ii);
+for ii = 1:length(valid_frames) 
+
+    % get frame id
+    frame_id = valid_frames(ii);
+
+    fprintf('Beginning Preprocessing Frame ID: %d...', frame_id);
     
     % read in segmented images
     filename_seg_base_nspec = count(filename_seg_base, '%');
-    filename_seg = sprintf(filename_seg_base, time_index * ones(1, filename_seg_base_nspec));
+    filename_seg = sprintf(filename_seg_base, frame_id * ones(1, filename_seg_base_nspec));
     seg = readKLBstack(filename_seg, numThreads);
     
     % read in raw images
     filename_raw_base_nspec = count(filename_raw_base, '%');
-    filename_raw = sprintf(filename_raw_base, time_index * ones(1, filename_raw_base_nspec));
+    filename_raw = sprintf(filename_raw_base, frame_id * ones(1, filename_raw_base_nspec));
     raw = readKLBstack(filename_raw, numThreads);
     
     % Exclude regions in segmented image whose mean intensities are within 2 stds of the background
@@ -87,13 +79,11 @@ for ii = 1:length(valid_time_indices)
     s_all = sum(raw, 'all');
     s_foreground = sum(raw(foreground_ind), 'all');
     background_mean = (s_all - s_foreground) / num_bg;
-%     background_mean = mean(raw(seg == 0));
 
     ss_all = double(sum((single(raw) - background_mean).^2, 'all'));
     ss_foreground = double(sum((single(raw(foreground_ind)) - background_mean).^2, 'all'));
     ss_bg = ss_all - ss_foreground;
     background_std = sqrt(ss_bg / (num_bg - 1));
-%     background_std = std(single(raw(seg == 0)));
 
     stats = regionprops3(seg, raw, {'MeanIntensity', 'Volume'});
     exclude_logical = abs(stats.MeanIntensity - background_mean) < background_std_threshold * background_std;
@@ -104,6 +94,7 @@ for ii = 1:length(valid_time_indices)
     cell_intensity_mean = mean(stats.MeanIntensity(~exclude_logical & ~nan_ind));
     cell_intensity_std = std(stats.MeanIntensity(~exclude_logical & ~nan_ind));
     
+    frame_false_negative = false;
     if do_false_negatives_filter
         raw_subtract = raw;
         raw_subtract(imdilate(seg > 0, strel('sphere', 10))) = background_mean;
@@ -113,21 +104,49 @@ for ii = 1:length(valid_time_indices)
         stats_BW = regionprops3(BW, raw_subtract, {'Volume', 'MeanIntensity'});
         if any(stats_BW.Volume > volume_threshold & ...
                abs(stats_BW.MeanIntensity - cell_intensity_mean) < cell_std_threshold * cell_intensity_std)
-            store_false_negatives_guess(ii) = true;
-        end
-    end
-
-    if ii > 1
-        if numcells < store_numcells(ii-1)
-            store_false_negatives_guess(ii) = true;
+%             store_false_negatives_guess(ii) = true;
+            frame_false_negative = true;
         end
     end
     
-    store_false_positives_guess{ii} = exclude_id;
-    store_numcells(ii) = numcells;
+%     store_false_positives_guess{ii} = exclude_id;
+%     store_numcells(ii) = numcells;
+
+    % Update output struct
+    if ~isempty(preprocess)
+        stored_frame_ids = [preprocess.frame_id].';
+        ind = find(ismember(stored_frame_ids, frame_id, 'rows'));
+
+        if isempty(ind)
+            ind = size(preprocess, 1) + 1;
+        end
+
+        preprocess(ind,1) = struct('frame_id', frame_id, ...
+                                   'false_positive_ids_guess', exclude_id, ...
+                                   'num_cells', numcells, ...
+                                   'false_negative_guess', frame_false_negative);
+    else
+        preprocess = struct('frame_id', frame_id, ...
+                            'false_positive_ids_guess', exclude_id, ...
+                            'num_cells', numcells, ...
+                            'false_negative_guess', frame_false_negative);
+    end 
     
     fprintf(' Done!\n');
 end
 toc;
 
-save(output_name, 'store_false_positives_guess', 'store_false_negatives_guess', 'store_numcells');
+% Loop through frames and identify if the number of cells goes down between frames
+stored_frame_ids = [preprocess.frame_id].';
+for ii = 1:size(preprocess, 1)
+    frame_id = preprocess(ii).frame_id;
+    if frame_id > 0
+        frame_id_prev = frame_id - 1;
+        prev_ind = find(stored_frame_ids == frame_id_prev);
+        if preprocess(ii).num_cells < preprocess(prev_ind).num_cells
+            preprocess(ii).false_negative_guess = true;
+        end
+    end
+end
+
+save(preprocess_output, 'preprocess');

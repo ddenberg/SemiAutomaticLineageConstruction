@@ -66,11 +66,9 @@ voxel_vol = xyz_res^3;
 sigma2_threshold = 5;
 
 % Name of preprocessing output
-Preprocess_filename = 'preprocess_output.mat';
+Preprocess_filename = 'preprocess.mat';
 if use_preprocess_false_positives
-    preprocess = load(Preprocess_filename);
-else
-    preprocess = struct('store_false_positives_guess', cell(length(0:final_frame), 1));
+    load(Preprocess_filename);
 end
 
 % Option to downsample point clouds in the saved output. Will reduce storage space
@@ -104,12 +102,17 @@ for ii = 1:size(frame_pairs, 1)
 
     % Exclude regions in segmented image whose mean intensities are within 2 stds of the background
     if use_preprocess_false_positives
-        temp = preprocess.store_false_positives_guess{frame_pair(1)+1};
+        stored_frame_ids = [preprocess.frame_id].';
+
+        ind_frame1 = find(stored_frame_ids == frame_pair(1));
+        ind_frame2 = find(stored_frame_ids == frame_pair(2));
+
+        temp = preprocess(ind_frame1).false_positive_ids_guess;
         for jj = 1:length(temp)
             seg1(seg1 == temp(jj)) = 0;
         end
 
-        temp = preprocess.store_false_positives_guess{frame_pair(2)+1};
+        temp = preprocess(ind_frame2).false_positive_ids_guess;
         for jj = 1:length(temp)
             seg2(seg2 == temp(jj)) = 0;
         end
