@@ -34,7 +34,8 @@ addpath(genpath('CPD2/data'));
 
 % What is the prefix for the embryo names?
 % filename_seg_base = 'E:/Posfai_Lab/rpky/220309_out/st0/klb/klbOut_Cam_Long_%05d.lux.label.klb';
-filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309_out/st0/klb/klbOut_Cam_Long_%05d.lux.label.klb';
+% filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309_out/st0/klb/klbOut_Cam_Long_%05d.lux.label.klb';
+filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/Segmentation/220309_new_out/klb/klbOut_Cam_Long_%05d.lux.label.klb';
 
 % Name of output file
 Registration_filename = 'transforms.mat';
@@ -45,12 +46,12 @@ else
 end
 
 % Set this to true to exclude the false positives found using the Preprocess_seg_errors script
-use_preprocess_false_positives = true;
+use_preprocess_false_positives = false;
 
 % Which pairs of frames to run over. Remember that the first frame is 0.
 % If you would like to re-register for certain frame pairs then set [frame_pairs] accordingly.
-first_frame = 0;
-final_frame = 100;
+first_frame = 70;
+final_frame = 72;
 frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 % Voxel size before making isotropic
@@ -77,7 +78,7 @@ downsample_fraction = 1/10;
 numTrials = 1e3;
 
 % Do final registration with full point clouds
-final_full_register = true;
+final_full_register = false;
 
 tic;
 for ii = 1:size(frame_pairs, 1)

@@ -6,10 +6,6 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Set numThreads to the number of cores in your computer. If your processor
-% supports hyperthreading/multithreading then set it to 2 x [number of cores]
-numThreads = 4;
-
 %Change path here to point to CPD2 folder
 addpath(genpath('CPD2/core'));
 addpath(genpath('CPD2/data'));
@@ -17,14 +13,14 @@ addpath(genpath('CPD2/data'));
 addpath(genpath('graph_matching'))
 
 % Name of registration output file
-registration_filename = 'registration_output.mat';
+registration_filename = 'transforms.mat';
 load(registration_filename);
 
 % Graph output file
 graph_output = 'graph_proposed.mat';
 
 %Set graph input if you would like to restart from a previously constructed tree
-graph_input = '';
+graph_input = 'graph_proposed.mat';
 if ~isempty(graph_input)
     load(graph_input);
 else
@@ -36,8 +32,8 @@ show_plots = true;
 
 % Which pairs of frames to run over. Remember that the first frame is 0.
 % If you would like to re-match certain frame pairs then set [frame_pairs] accordingly.
-first_frame = 0;
-final_frame = 40;
+first_frame = 70;
+final_frame = 72;
 frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 %%%%%%%%%%%% IMPORTANT FLAG %%%%%%%%%%%%%%%%
@@ -52,6 +48,8 @@ load_lineage_corrections = true;
 lineage_corrections_filename = 'lineage_corrections.csv';
 if load_lineage_corrections
     lineage_corrections = read_lineage_corrections(lineage_corrections_filename);
+else
+    lineage_corrections = [];
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -72,7 +70,7 @@ for ii = 1:size(frame_pairs, 1)
     % get pair of frames
     frame_pair = frame_pairs(ii,:);
 
-    fprintf('Beginning graph matching for pair (%d, %d)...', frame_pair(1), frame_pair(2));
+    fprintf('Beginning graph matching for pair (%d, %d)...\n', frame_pair(1), frame_pair(2));
 
     % Get index of registration struct
     registration_frame_pairs = cell2mat({registration.frame_pair}.');
@@ -129,9 +127,18 @@ for ii = 1:size(frame_pairs, 1)
     else
         division_constraints = [];
     end
-    lineage_constraints = get_lineage_constraints(lineage_corrections, uVal1, uVal2, frame_pair(1), frame_pair(2));
+    if ~isempty(lineage_corrections)
+        lineage_constraints = get_lineage_constraints(lineage_corrections, uVal1, uVal2, frame_pair(1), frame_pair(2));
+    else
+        lineage_constraints = [];
+    end
 
-    X_min = ConstrainedMinimization(X0, A_old, A_new, B_old, B_new, graph_match_lambda, division_constraints, lineage_constraints);
+    if size(A_old, 1) ~= size(A_new, 1)
+        X_min = ConstrainedMinimization_General(X0, A_old, A_new, B_old, B_new, graph_match_lambda, ...
+            division_constraints, lineage_constraints);
+    else
+        X_min = FastPFP(X0, A_old, A_new, B_old, B_new, 0.5, graph_match_lambda, 1e-6, 1e-6, 1000, 100);
+    end
     [~, match_ind] = max(X_min, [], 1);
     
     match_pairs = [uVal1(match_ind), uVal2];

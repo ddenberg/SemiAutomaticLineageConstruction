@@ -7,7 +7,7 @@ addpath(genpath('CPD2/data'));
 addpath(genpath('graph_matching'))
 
 % Name of registration output file
-registration_filename = 'registration_output.mat';
+registration_filename = 'transforms.mat';
 load(registration_filename);
 
 % Name of graph matching output file
@@ -16,8 +16,8 @@ load(graph_output);
 
 % Which pairs of frames to run over. Remember that the first frame is 0.
 % If you would like to re-match certain frame pairs then set [frame_pairs] accordingly.
-first_frame = 0;
-final_frame = 40;
+first_frame = 70;
+final_frame = 72;
 frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 % also, check the alignment of this one with the time frame after

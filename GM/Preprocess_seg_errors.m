@@ -23,8 +23,10 @@ numThreads = 4;
 % What is the prefix for the embryo names?
 % filename_seg_base = 'E:/Posfai_Lab/rpky/220309_out/st0/klb/klbOut_Cam_Long_%05d.lux.label.klb';
 % filename_raw_base = 'E:/Posfai_Lab/rpky/220309/stack_0_channel_0_obj_left/out/folder_Cam_Long_%05d.lux/klbOut_Cam_Long_%05d.lux.klb';
-filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309_out/st0/klb/klbOut_Cam_Long_%05d.lux.label.klb';
-filename_raw_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309/stack_0_channel_0_obj_left/out/folder_Cam_Long_%05d.lux/klbOut_Cam_Long_%05d.lux.klb';
+% filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309_out/st0/klb/klbOut_Cam_Long_%05d.lux.label.klb';
+filename_raw_base = '/media/david/Seagate_Exp/Posfai_Lab/MouseData/220309/stack_0_channel_0_obj_left/out/folder_Cam_Long_%05d.lux/klbOut_Cam_Long_%05d.lux.klb';
+filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/Segmentation/220309_new_out/klb/klbOut_Cam_Long_%05d.lux.label.klb';
+
 
 % Change name or destination of the output
 preprocess_output = 'preprocess.mat';
@@ -35,8 +37,9 @@ else
 end
 
 % Which image frames to run over. Remember that the first frame is 0
-final_frame = 100;
-valid_frames = 0:final_frame;
+final_frame = 0;
+% valid_frames = 0:final_frame;
+valid_frames = 72;
 
 % How many standard deviations within background noise to flag false positives
 background_std_threshold = 2;
@@ -51,9 +54,9 @@ volume_threshold = 3000;
 % How many standard deviations within nuclei signal to flag for false negative
 cell_std_threshold = 2;
 
-store_false_positives_guess = cell(length(valid_frames), 1);
-store_numcells = zeros(length(valid_frames), 1);
-store_false_negatives_guess = false(length(valid_frames), 1);
+% store_false_positives_guess = cell(length(valid_frames), 1);
+% store_numcells = zeros(length(valid_frames), 1);
+% store_false_negatives_guess = false(length(valid_frames), 1);
 
 tic;
 for ii = 1:length(valid_frames) 
