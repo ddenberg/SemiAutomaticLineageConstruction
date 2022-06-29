@@ -32,7 +32,7 @@ show_plots = true;
 
 % Which pairs of frames to run over. Remember that the first frame is 0.
 % If you would like to re-match certain frame pairs then set [frame_pairs] accordingly.
-first_frame = 70;
+first_frame = 29;
 final_frame = 72;
 frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
@@ -54,6 +54,10 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% graph_match_sigma_mult is a scaling paramter for the adjacency matrix. 
+% Larger sigma values weight further cells higher.
+graph_match_sigma_mult = 2;
+
 % Graph matching parameter lambda. Lambda controls how much to weight cell
 % volumes. If changing lambda does not produces better results then you will
 % have to add manual corrections.
@@ -63,6 +67,10 @@ graph_match_lambda = 1;
 % If division_threshold = 20, then a daughter cell can only divide after 20
 % frames after its mother divided.
 division_time_threshold = 20;
+
+% Penalty parameter to enforce inequality A x < b in constrained optimization
+% If you aren't getting the correct matches try adjusting this parameter
+objfun_penalty = 1e-2;
 
 % also, check the alignment of this one with the time frame after
 for ii = 1:size(frame_pairs, 1)
@@ -108,7 +116,7 @@ for ii = 1:size(frame_pairs, 1)
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
-    sigma = 2 * average_cell_radius;
+    sigma = graph_match_sigma_mult * average_cell_radius;
     A_old = squareform(pdist(centroids1));
     A_new = squareform(pdist(centroids2_transform));
     A_old = exp(-A_old.^2 / (2 * sigma^2));
@@ -121,7 +129,7 @@ for ii = 1:size(frame_pairs, 1)
     Dist_new_old = pdist2(centroids1, centroids2_transform);
     X0 = exp(-Dist_new_old.^2 / (2 * sigma^2));
     
-    if frame_pair(1) > 0
+    if numnodes(G_lineage) > 0
         G_lineage = get_proposed_tree(G_lineage, frame_pair(1));
         division_constraints = get_division_constraints(G_lineage, division_time_threshold, frame_pair(1));
     else
@@ -134,12 +142,24 @@ for ii = 1:size(frame_pairs, 1)
     end
 
     if size(A_old, 1) ~= size(A_new, 1)
-        X_min = ConstrainedMinimization_General(X0, A_old, A_new, B_old, B_new, graph_match_lambda, ...
-            division_constraints, lineage_constraints);
+        X_min = ConstrainedMinimization_Penalty(X0, A_old, A_new, B_old, B_new, graph_match_lambda, ...
+            division_constraints, lineage_constraints, objfun_penalty);
+
+        [~, match_ind] = max(X_min, [], 1);
     else
-        X_min = FastPFP(X0, A_old, A_new, B_old, B_new, 0.5, graph_match_lambda, 1e-6, 1e-6, 1000, 100);
+        if ~isempty(lineage_constraints)
+            % make sure initial condition satisfies the constraints
+        
+            for jj = 1:size(lineage_constraints, 1)
+                X0(:,lineage_constraints(jj,2)) = 0;
+                X0(lineage_constraints(jj,1), lineage_constraints(jj,2)) = 1;
+            end
+        end
+
+        M = matchpairs(X0, 0, 'max');
+        match_ind = M(:,1);
     end
-    [~, match_ind] = max(X_min, [], 1);
+    
     
     match_pairs = [uVal1(match_ind), uVal2];
     nodes = [arrayfun(@(ind) sprintf('%03d_%03d', frame_pair(1), ind), uVal1, 'UniformOutput', false); 
@@ -173,8 +193,8 @@ for ii = 1:size(frame_pairs, 1)
         hold on;
         scatter3(ptCloud2_transform(:,1), ptCloud2_transform(:,2), ptCloud2_transform(:,3), '.b');
         axis equal vis3d;
-        
-        % visualization for checking if everything is correct - 3d plot of edges and nodes
+                
+%         % visualization for checking if everything is correct - 3d plot of edges and nodes
         plot(sample_graph, 'XData', sample_graph.Nodes.xpos, 'YData', sample_graph.Nodes.ypos, ...
             'ZData', sample_graph.Nodes.zpos, 'EdgeColor', 'k', 'LineWidth', 2.0, 'Interpreter', 'none');
         title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
@@ -191,8 +211,7 @@ for ii = 1:size(frame_pairs, 1)
         clf;
         plot(G_lineage,'layout','layered', 'Interpreter', 'none');
         title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
-%         disp('time index');
-%         disp(time_index);
+
         drawnow;
         pause;
     end
