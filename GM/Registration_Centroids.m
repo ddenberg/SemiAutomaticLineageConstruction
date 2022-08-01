@@ -34,11 +34,13 @@ addpath(genpath('CPD2/data'));
 
 % What is the prefix for the embryo names?
 % filename_seg_base = 'E:/Posfai_Lab/rpky/220309_out/st0/klb/klbOut_Cam_Long_%05d.lux.label.klb';
-% filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309_out/st0/klb/klbOut_Cam_Long_%05d.lux.label.klb';
 filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/Segmentation/220309_new_out/klb/klbOut_Cam_Long_%05d.lux.label.klb';
+filename_seg_base_corr = '/media/david/Seagate_Exp/Posfai_Lab/Segmentation/220309_new_out/klb/klbOut_Cam_Long_%05d.lux_SegmentationCorrected.klb';
+% filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/MouseData/210501_gata_nanog_st7_updated_JAN22/labels_cleaned/Stardist3D_klbOut_Cam_Long_%05d.klb';
 
 % Name of output file
-Registration_filename = 'transforms.mat';
+% Registration_filename = 'transforms_gata_nanog.mat';
+Registration_filename = 'transforms';
 if isfile(Registration_filename)
     load(Registration_filename);
 else
@@ -50,8 +52,8 @@ use_preprocess_false_positives = false;
 
 % Which pairs of frames to run over. Remember that the first frame is 0.
 % If you would like to re-register for certain frame pairs then set [frame_pairs] accordingly.
-first_frame = 70;
-final_frame = 72;
+first_frame = 0;
+final_frame = 100;
 frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 % Voxel size before making isotropic
@@ -66,7 +68,7 @@ voxel_vol = xyz_res^3;
 sigma2_threshold = 5;
 
 % Name of preprocessing output
-Preprocess_filename = 'preprocess.mat';
+Preprocess_filename = '';
 if use_preprocess_false_positives
     load(Preprocess_filename);
 end
@@ -81,6 +83,7 @@ numTrials = 1e3;
 final_full_register = false;
 
 tic;
+store_registration = cell(size(frame_pairs, 1), 1);
 for ii = 1:size(frame_pairs, 1)
     
     % get pair of frames
@@ -90,11 +93,23 @@ for ii = 1:size(frame_pairs, 1)
     
     % read in segmented images
     filename_seg_base_nspec = count(filename_seg_base, '%');
+    filename_seg_base_corr_nspec = count(filename_seg_base_corr, '%');
+
     filename_seg = sprintf(filename_seg_base, frame_pair(1) * ones(1, filename_seg_base_nspec));
-    seg1 = readKLBstack(filename_seg, numThreads);
+    filename_seg_corr = sprintf(filename_seg_base_corr, frame_pair(1) * ones(1, filename_seg_base_corr_nspec));
+    if isfile(filename_seg_corr)
+        seg1 = readKLBstack(filename_seg_corr, numThreads);
+    else
+        seg1 = readKLBstack(filename_seg, numThreads);
+    end
     
     filename_seg = sprintf(filename_seg_base, frame_pair(2) * ones(1, filename_seg_base_nspec));
-    seg2 = readKLBstack(filename_seg, numThreads);    
+    filename_seg_corr = sprintf(filename_seg_base_corr, frame_pair(2) * ones(1, filename_seg_base_corr_nspec));
+    if isfile(filename_seg_corr)
+        seg2 = readKLBstack(filename_seg_corr, numThreads);
+    else
+        seg2 = readKLBstack(filename_seg, numThreads);
+    end
     
     % Rescale image 
     resXY = 0.208;
@@ -235,6 +250,15 @@ for ii = 1:size(frame_pairs, 1)
         Transform_best.t = Transform.t + Transform_init.t;
     end
 
+    temp = Transform_best;
+    temp.Rotation = Transform_best.R;
+    temp.Translation = Transform_best.t;
+    temp.Centroids1 = centroids1;
+    temp.Centroids2 = centroids2;
+    temp.NumberTrials = step;
+    temp.minSigma = sigma2_best;
+    store_registration{ii,1} = temp;
+
     % Update registration struct
     if ~isempty(registration)
         stored_frame_pairs = cell2mat({registration.frame_pair}.');
@@ -273,3 +297,4 @@ registration = registration(ind,:);
 
 % Save output
 save(Registration_filename, 'registration');
+save([Registration_filename, '_LisaCompatible.mat'], 'store_registration')

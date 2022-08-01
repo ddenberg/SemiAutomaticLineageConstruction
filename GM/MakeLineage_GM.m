@@ -13,13 +13,16 @@ addpath(genpath('CPD2/data'));
 addpath(genpath('graph_matching'))
 
 % Name of registration output file
+% registration_filename = 'transforms_gata_nanog.mat';
 registration_filename = 'transforms.mat';
 load(registration_filename);
 
 % Graph output file
+% graph_output = 'graph_proposed_gata_nanog.mat';
 graph_output = 'graph_proposed.mat';
 
 %Set graph input if you would like to restart from a previously constructed tree
+% graph_input = 'graph_proposed_gata_nanog.mat';
 graph_input = 'graph_proposed.mat';
 if ~isempty(graph_input)
     load(graph_input);
@@ -32,8 +35,8 @@ show_plots = true;
 
 % Which pairs of frames to run over. Remember that the first frame is 0.
 % If you would like to re-match certain frame pairs then set [frame_pairs] accordingly.
-first_frame = 29;
-final_frame = 72;
+first_frame = 74;
+final_frame = 75;
 frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 %%%%%%%%%%%% IMPORTANT FLAG %%%%%%%%%%%%%%%%
@@ -45,6 +48,7 @@ frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 load_lineage_corrections = true;
 
+% lineage_corrections_filename = 'lineage_corrections_gata_nanog.csv';
 lineage_corrections_filename = 'lineage_corrections.csv';
 if load_lineage_corrections
     lineage_corrections = read_lineage_corrections(lineage_corrections_filename);
@@ -56,7 +60,7 @@ end
 
 % graph_match_sigma_mult is a scaling paramter for the adjacency matrix. 
 % Larger sigma values weight further cells higher.
-graph_match_sigma_mult = 2;
+graph_match_sigma_mult = 2.75;
 
 % Graph matching parameter lambda. Lambda controls how much to weight cell
 % volumes. If changing lambda does not produces better results then you will
@@ -71,6 +75,10 @@ division_time_threshold = 20;
 % Penalty parameter to enforce inequality A x < b in constrained optimization
 % If you aren't getting the correct matches try adjusting this parameter
 objfun_penalty = 1e-2;
+
+% use SQP solver (instead of interior point)
+% if 'use_sqp' is false the solver is much faster but potentially less accurate
+use_sqp = false;
 
 % also, check the alignment of this one with the time frame after
 for ii = 1:size(frame_pairs, 1)
@@ -142,8 +150,13 @@ for ii = 1:size(frame_pairs, 1)
     end
 
     if size(A_old, 1) ~= size(A_new, 1)
-        X_min = ConstrainedMinimization_Penalty(X0, A_old, A_new, B_old, B_new, graph_match_lambda, ...
-            division_constraints, lineage_constraints, objfun_penalty);
+        if use_sqp
+            X_min = ConstrainedMinimization_SQPWrapper(X0, A_old, A_new, B_old, B_new, graph_match_lambda, ...
+                division_constraints, lineage_constraints);
+        else
+            X_min = ConstrainedMinimization_Penalty(X0, A_old, A_new, B_old, B_new, graph_match_lambda, ...
+                division_constraints, lineage_constraints, objfun_penalty);
+        end
 
         [~, match_ind] = max(X_min, [], 1);
     else
@@ -184,6 +197,11 @@ for ii = 1:size(frame_pairs, 1)
     node_colors(1:size(centroids1, 1),1) = 1;
     node_colors(size(centroids1, 1)+1:end,3) = 1;
 
+    fprintf(' Done!\n');
+
+    % Save lineage tree
+    save(graph_output, 'G_lineage');
+
     if show_plots
         % show point clouds registered (red is earlier time point)
         figure(1);
@@ -215,9 +233,4 @@ for ii = 1:size(frame_pairs, 1)
         drawnow;
         pause;
     end
-
-    fprintf(' Done!\n');
-
-    % Save lineage tree
-    save(graph_output, 'G_lineage');
 end

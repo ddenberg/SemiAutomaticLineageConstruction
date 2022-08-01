@@ -25,7 +25,9 @@ numThreads = 4;
 % filename_raw_base = 'E:/Posfai_Lab/rpky/220309/stack_0_channel_0_obj_left/out/folder_Cam_Long_%05d.lux/klbOut_Cam_Long_%05d.lux.klb';
 % filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/rpky/220309_out/st0/klb/klbOut_Cam_Long_%05d.lux.label.klb';
 filename_raw_base = '/media/david/Seagate_Exp/Posfai_Lab/MouseData/220309/stack_0_channel_0_obj_left/out/folder_Cam_Long_%05d.lux/klbOut_Cam_Long_%05d.lux.klb';
+
 filename_seg_base = '/media/david/Seagate_Exp/Posfai_Lab/Segmentation/220309_new_out/klb/klbOut_Cam_Long_%05d.lux.label.klb';
+filename_seg_base_corr = '/media/david/Seagate_Exp/Posfai_Lab/Segmentation/220309_new_out/klb/klbOut_Cam_Long_%05d.lux_SegmentationCorrected.klb';
 
 
 % Change name or destination of the output
@@ -37,9 +39,9 @@ else
 end
 
 % Which image frames to run over. Remember that the first frame is 0
-final_frame = 0;
-% valid_frames = 0:final_frame;
-valid_frames = 72;
+first_frame = 0;
+final_frame = 100;
+valid_frames = first_frame:final_frame;
 
 % How many standard deviations within background noise to flag false positives
 background_std_threshold = 2;
@@ -69,7 +71,14 @@ for ii = 1:length(valid_frames)
     % read in segmented images
     filename_seg_base_nspec = count(filename_seg_base, '%');
     filename_seg = sprintf(filename_seg_base, frame_id * ones(1, filename_seg_base_nspec));
-    seg = readKLBstack(filename_seg, numThreads);
+
+    filename_seg_base_corr_nspec = count(filename_seg_base_corr, '%');
+    filename_seg_corr = sprintf(filename_seg_base_corr, frame_id * ones(1, filename_seg_base_corr_nspec));
+    if isfile(filename_seg_corr)
+        seg = readKLBstack(filename_seg_corr, numThreads);
+    else
+        seg = readKLBstack(filename_seg, numThreads);
+    end
     
     % read in raw images
     filename_raw_base_nspec = count(filename_raw_base, '%');

@@ -3,22 +3,15 @@
 %Change path here to point to CPD2 folder
 addpath(genpath('CPD2/core'));
 addpath(genpath('CPD2/data'));
-%path to graph_matching folder
-addpath(genpath('graph_matching'))
 
 % Name of registration output file
-% registration_filename = 'transforms_gata_nanog.mat';
-registration_files = 'transforms.mat';
+registration_filename = 'transforms_gata_nanog.mat';
 load(registration_filename);
-
-% Name of graph matching output file
-graph_output = 'graph_proposed.mat';
-load(graph_output);
 
 % Which pairs of frames to run over. Remember that the first frame is 0.
 % If you would like to re-match certain frame pairs then set [frame_pairs] accordingly.
-first_frame = 0;
-final_frame = 20;
+first_frame = 75;
+final_frame = 178;
 frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 % also, check the alignment of this one with the time frame after
@@ -55,19 +48,6 @@ for ii = 1:size(frame_pairs, 1)
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
-    
-    nodes = [arrayfun(@(ind) sprintf('%03d_%03d', frame_pair(1), ind), uVal1, 'UniformOutput', false); 
-             arrayfun(@(ind) sprintf('%03d_%03d', frame_pair(2), ind), uVal2, 'UniformOutput', false)];
-
-    sample_graph = subgraph(G_lineage, nodes);
-    
-    node_pos_x = [centroids1(:,1); centroids2_transform(:,1)];
-    node_pos_y = [centroids1(:,2); centroids2_transform(:,2)];
-    node_pos_z = [centroids1(:,3); centroids2_transform(:,3)];
-
-    node_colors = zeros(size(nodes, 1), 3);
-    node_colors(1:size(centroids1, 1),1) = 1;
-    node_colors(size(centroids1, 1)+1:end,3) = 1;
 
     % show point clouds registered (red is earlier time point)
     figure(1);
@@ -77,24 +57,6 @@ for ii = 1:size(frame_pairs, 1)
     hold on;
     scatter3(ptCloud2_transform(:,1), ptCloud2_transform(:,2), ptCloud2_transform(:,3), '.b');
     axis equal vis3d;
-    title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
-    
-    % visualization for checking if everything is correct - 3d plot of edges and nodes
-    plot(sample_graph, 'XData', node_pos_x, 'YData', node_pos_y, 'ZData', node_pos_z, ...
-        'EdgeColor', 'k', 'LineWidth', 2.0, 'Interpreter', 'none');
-
-    figure(2);
-    clf;
-    plot(sample_graph, 'XData', node_pos_x, 'YData', node_pos_y, 'ZData', node_pos_z, ...
-        'EdgeColor', 'k', 'LineWidth', 2.0,'NodeLabel',sample_graph.Nodes.Name, ...
-        'NodeColor', node_colors, 'Interpreter', 'none');
-    axis equal vis3d;
-    title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
-        
-    figure(3);
-    clf;
-    G_proposed = get_proposed_tree(G_lineage, frame_pair(2));
-    plot(G_proposed,'layout','layered', 'Interpreter', 'none');
     title(sprintf('Pair (%d, %d)', frame_pair(1), frame_pair(2)));
     
     pause;
