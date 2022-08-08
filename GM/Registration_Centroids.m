@@ -40,20 +40,17 @@ filename_seg_base_corr = '/media/david/Seagate_Exp/Posfai_Lab/Segmentation/22030
 
 % Name of output file
 % Registration_filename = 'transforms_gata_nanog.mat';
-Registration_filename = 'transforms';
+Registration_filename = 'test';
 if isfile(Registration_filename)
     load(Registration_filename);
 else
     registration = [];
 end
 
-% Set this to true to exclude the false positives found using the Preprocess_seg_errors script
-use_preprocess_false_positives = false;
-
 % Which pairs of frames to run over. Remember that the first frame is 0.
 % If you would like to re-register for certain frame pairs then set [frame_pairs] accordingly.
 first_frame = 0;
-final_frame = 100;
+final_frame = 5;
 frame_pairs = [(first_frame:final_frame-1).', (first_frame+1:final_frame).'];
 
 % Voxel size before making isotropic
@@ -66,6 +63,9 @@ voxel_vol = xyz_res^3;
 
 % Threshold to accept registration
 sigma2_threshold = 5;
+
+% Set this to true to exclude the false positives found using the Preprocess_seg_errors script
+use_preprocess_false_positives = false;
 
 % Name of preprocessing output
 Preprocess_filename = '';
@@ -252,7 +252,7 @@ for ii = 1:size(frame_pairs, 1)
 
     temp = Transform_best;
     temp.Rotation = Transform_best.R;
-    temp.Translation = Transform_best.t;
+    temp.Translation = Transform_best.t.';
     temp.Centroids1 = centroids1;
     temp.Centroids2 = centroids2;
     temp.NumberTrials = step;
